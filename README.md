@@ -37,6 +37,7 @@ A group project for INST 326 final.
 # DO NOT FORGET TO TYPE IN "git push" IN YOUR TERMINAL AFTER ALL COMMITS SO THAT WE CAN ALL SEE IT
 This is the turn order
 
+   always write git pull first before anything
    Make Changes in Document
    Save the Changes in the document 
    Stage and Commit changes
