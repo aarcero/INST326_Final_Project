@@ -4,6 +4,7 @@ A group project for INST 326 final.
 
 ## Team Members
 - Yuanfeng Du
+- Alden Arce-Romero
 
 ## How to set up
 
@@ -32,10 +33,16 @@ A group project for INST 326 final.
 - Do not push directly to main without telling the group
 
 
-DO NOT FORGET TO TYPE IN "git push" IN YOUR TERMINAL AFTER ALL COMMITS SO THAT WE CAN ALL SEE IT
+# DO NOT FORGET TO TYPE IN "git push" IN YOUR TERMINAL AFTER ALL COMMITS SO THAT WE CAN ALL SEE IT
 This is the turn order
 
    Make Changes in Document
    Save the Changes in the document 
    Stage and Commit changes
    git push in terminal
+
+whenever there are changes that other team members have created, to receive them in your local computer, type in the terminal 
+
+   git pull
+
+The changes will show up locally for you.
