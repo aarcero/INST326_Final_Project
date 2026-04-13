@@ -5,6 +5,7 @@ A group project for INST 326 final.
 ## Team Members
 - Yuanfeng Du
 - Alden Arce-Romero
+- Christopher Caballero
 
 ## How to set up
 
