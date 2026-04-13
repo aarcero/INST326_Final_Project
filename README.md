@@ -1,34 +1,41 @@
-<<<<<<< HEAD
-# INST326_Final_Project
+# INST326 Final Project
+
 A group project for INST 326 final.
 
-
-Team members: Yuanfeng Du
-=======
-# INST326 Final Project
+## Team Members
+- Yuanfeng Du
 
 ## How to set up
 
-1. First, make sure that your computer is recognizes your git account so that you can push commits and changes. Write the following in your terminal:
+1. Make sure your Git is configured:
 
-# git config --global user.name "Your Name"
-# git config --global user.email "your_email@example.com"
+   git config --global user.name "Your Name"  
+   git config --global user.email "your_email@example.com"
 
-if you already have one connected but are unsure, write this instead to see what it is
-
-# git config --global user.name 
-# git config --global user.email  
+   To check:
+   
+   git config --global user.name  
+   git config --global user.email  
 
 2. Accept the GitHub invite
 
-3. Clone the repo in your terminal:
+3. Clone the repo:
 
-# git clone https://github.com/aarcero/INST326_Final_Project.git
+   git clone https://github.com/aarcero/INST326_Final_Project.git
 
-4. Go into the folder to make sure it exists:
+4. Go into the folder:
+
    cd INST326_Final_Project
 
 ## Notes
 - We will use Git to collaborate
 - Do not push directly to main without telling the group
->>>>>>> master
+
+
+DO NOT FORGET TO TYPE IN "git push" IN YOUR TERMINAL AFTER ALL COMMITS SO THAT WE CAN ALL SEE IT
+This is the turn order
+
+   Make Changes in Document
+   Save the Changes in the document 
+   Stage and Commit changes
+   git push in terminal
