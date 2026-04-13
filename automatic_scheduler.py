@@ -14,3 +14,13 @@ class Course:
         self.section = section
         self.time = time
         self.dates = dates
+
+Class Major:
+    def __init__(self, name, required_courses=None, elective_courses=None):
+        if required_courses is None:
+            required_courses = []
+        if elective_courses is None:
+            elective_courses = []
+        self.name = name
+        self.required_courses = required_courses
+        self.elective_courses = elective_courses
