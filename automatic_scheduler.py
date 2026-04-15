@@ -1,11 +1,5 @@
-# Du:
-# - Implemented Person inheritance for Student/Advisor.
-# - Add new class AdvisorRecommendation to wrap Course objects.
-# - Added conflicts_with for future scheduling logic.
-# - A new class method from_csv_row is added to AdvisorRecommendation to create instances from CSV data.
 import sys
 import csv
-
 
 class Person:
     """Parent class for all individuals in the system."""
@@ -41,7 +35,6 @@ class Advisor(Person):
         super().__init__(name, directory_id)
         self.department = department
 
-
 class Course:
     def __init__(self, name, credits, prerequisites=None, semester_term=None, 
                  section=None, time=None, dates=None, category=None):
@@ -58,28 +51,24 @@ class Course:
             dates (str): The days of the week (e.g., 'MWF').
         """
 
-        self.name = name
-        self.credits = credits
+        if prerequisites is None:
+            prerequisites = []
 
-        if prerequisites:
-            self.prerequisites = prerequisites
-        else:
-            self.prerequisites = []
-
-        self.semester_term = semester_term
-        self.section = section
-        self.time = time
-
-        # If days is a string like "MWF", it converts to ['M', 'W', 'F'].
+       # If days is a string like "MWF", it converts to ['M', 'W', 'F'].
         # This makes it easier to check if a course meets on a specific day.
         if isinstance(dates, str):
             self.dates = list(dates)
+        elif dates == None:
+            self.dates = []
         else:
-            if dates:
-                self.dates = dates
-            else:
-                self.dates = []
+            self.dates = dates
 
+        self.name = name
+        self.credits = credits
+        self.prerequisites = prerequisites
+        self.semester_term = semester_term
+        self.section = section
+        self.time = time
         self.category = category
 
         # Convert time string to numeric minutes for conflict detection.
@@ -95,10 +84,7 @@ class Course:
         Returns:
             int: Minutes since midnight.
         """
-        if time is None:
-            return 0
-            
-        if "-" not in time:
+        if time is None or "-" not in time:
             return 0
         
         # We use a try-except to ensure 
@@ -121,48 +107,9 @@ class Course:
             print(f"Warning: Could not parse time for {self.name}")
             return 0
         
-    def conflicts_with(self, other):
-        """Checks if this course conflicts with another based on days and time."""
-        
-        common_days = set(self.dates) & set(other.dates)
-        if common_days and self.start_minutes == other.start_minutes:
-            return True
-        return False
-    
     def __str__(self):
         """Returns a readable string of the course."""
         return f"Course: {self.name}, Section: {self.section}, Time: {self.time}"
-    
-
-class AdvisorRecommendation:
-    """
-    Wraps a Course object with advisor-specific priority.
-    This allows advisors to provide recommendations for students.
-    """
-    def __init__(self, course_obj, priority=1, notes=""):
-        self.course = course_obj
-        self.priority = priority
-        self.notes = notes
-
-    @classmethod
-    def from_csv_row(cls, row):
-        """
-        A factory method to create an instance from a CSV dictionary.
-        This is a class method because it acts on the class itself
-        to return a new object.
-        """
-        # We extract and convert data types here so the rest of the 
-        # program doesn't have to deal with raw CSV strings.
-        temp_course = Course(
-            name=row['course_name'],
-            credits=int(row['credits']),
-            category=row['category'],
-            dates=row.get('days', ""),
-            time=row.get('time', "")
-        )
-        return cls(temp_course, priority=int(row.get('priority', 1)), 
-                   notes=row.get('notes', ""))
-    
        
 class Major:
     def __init__(self, name, required_courses=None, elective_courses=None):
@@ -174,23 +121,91 @@ class Major:
             required_courses (list): Courses required for graduation.
             elective_courses (list): Available elective courses.
         """
+        if required_courses is None:
+            required_courses = []
+        if elective_courses is None:
+            elective_courses = []
         self.name = name
+        self.required_courses = required_courses
+        self.elective_courses = elective_courses
 
-        if required_courses:
-            self.required_courses = required_courses
+
+class AdvisorRecommendation:
+    """Wraps a Course object with advisor-specific details using composition."""
+    def __init__(self, course_obj, category=None, subcategory=None, priority=1):
+        self.course = course_obj
+        self.category = category
+        self.subcategory = subcategory
+        self.priority = priority
+
+    @classmethod
+    def from_csv_row(cls, row):
+        """Factory method to create a recommendation from a CSV dictionary row."""
+        try:
+            # Strip whitespace and handle potential missing keys
+            raw_credits = row.get('Credits', '0').strip()
+            credits_val = int(raw_credits) if raw_credits.isdigit() else 0
+        except ValueError:
+            credits_val = 0
+
+        # Create the Course object using CSV column names
+        temp_course = Course(
+            name=row.get('Course', 'Unknown Course').strip(),
+            credits=credits_val
+        )
+        
+        category_val = row.get('Category', 'General').strip()
+        
+        # Priority logic
+        if "Benchmark" in category_val:
+            priority_val = 3
         else:
-            self.required_courses = []
+            if "Core" in category_val:
+                priority_val = 2
+            else:
+                priority_val = 1
             
-        if elective_courses:
-            self.elective_courses = elective_courses
-        else:
-            self.elective_courses = []
+        return cls(temp_course, category_val, row.get('Subcategory'), priority_val)
+    
 
+def load_courses_from_csv(file_path):
+    """Loads course data and returns AdvisorRecommendation objects."""
+    recommendations = []
+    try:
+        with open(file_path, mode='r', encoding='utf-8') as csvfile:
+            # IMPORTANT: Skip the title row "infosci_program" to reach headers
+            next(csvfile) 
+            
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                # Use your factory method here!
+                rec = AdvisorRecommendation.from_csv_row(row)
+                recommendations.append(rec)
+    except FileNotFoundError:
+        print(f"Error: {file_path} not found.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    
+    return recommendations
 
 if __name__ == "__main__":
-    print("Academic Scheduler Data Model loaded successfully.")
-    
-    # Simple test case
-    test_course = Course("INST326", 3, time="14:00-15:15", 
-                         prerequisites=["INST126"])
-    print(f"Test Course: {test_course.name}, Start Minutes: {test_course.start_minutes}")
+    print("Academic Scheduler starting\n")
+
+    test_course = Course("INST326", 3, time="14:00-15:15", prerequisites=["INST126"])
+    print(f"[TEST] {test_course.name} starts at {test_course.start_minutes} minutes\n")
+
+    file_path = "infosci_program.csv"
+
+    courses = load_courses_from_csv(file_path)
+    print(f"Loaded {len(courses)} courses.\n")
+
+    student = Student(
+        name="Test Student",
+        major="InfoSci",
+        completed_courses=["INST126", "MATH115"]
+    )
+
+    print("Courses student can take:\n")
+    for rec in courses:
+        if student.check_if_can_take(rec.course):
+            print(f"{rec.course} (Priority: {rec.priority})")
