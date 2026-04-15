@@ -1,0 +1,37 @@
+Category,Subcategory,Course,Credits
+General,General Education,General Education Total,40
+Major,InfoSci Major Total,InfoSci Major,45
+Benchmark I,Requirement,MATH 115 (or higher) – Precalculus,3
+Benchmark I,Requirement,PSYC 100 – Introduction to Psychology,3
+Benchmark II,Requirement,STAT 100 – Elementary Statistics and Probability,3
+Benchmark II,Requirement,INST 126 – Intro to Programming for Information Science,3
+Benchmark II,Requirement,INST 201 – Introduction to Information Science,3
+Core,INST Core,INST 201 Introduction to Information Science,
+Core,INST Core,INST 311 Information Organization,
+Core,INST Core,INST 314 Statistics for Information Science,
+Core,INST Core,INST 326 Object-Oriented Programming for Information Science,
+Core,INST Core,INST 327 Database Design and Modeling,
+Core,INST Core,INST 335 Teams and Organizations,
+Core,INST Core,"INST 346 Technologies, Infrastructures and Architecture",
+Core,INST Core,INST 352 Information User Needs and Assessment,
+Core,INST Core,INST 362 User-Centered Design,
+Core,INST Core,INST 490 Integrative Capstone,
+Elective,Cybersecurity & Privacy,INST 364 Human-Centered Cybersecurity,
+Elective,Cybersecurity & Privacy,INST 365 Ethical Hacking,
+Elective,Cybersecurity & Privacy,"INST 366 Privacy, Security, and Ethics for Big Data",
+Elective,Cybersecurity & Privacy,INST 464 Decision-Making for Cybersecurity,
+Elective,Cybersecurity & Privacy,"INST 466 Technology, Culture, and Society",
+Elective,Cybersecurity & Privacy,INST 467 Practical Hacking for Policy Making,
+Elective,Data Science,INST 354 Decision-Making for Information Science,
+Elective,Data Science,INST 377 Dynamic Web Applications,
+Elective,Data Science,INST 410 Managing with Data and Simulations,
+Elective,Data Science,INST 414 Advanced Data Science,
+Elective,Data Science,INST 447 Data Sources and Manipulation,
+Elective,Data Science,INST 462 Introduction to Data Visualization,
+Elective,Digital Curation,INST 341 Introduction to Digital Curation,
+Elective,Digital Curation,INST 441 Information Ethics and Policy,
+Elective,Digital Curation,INST 442 Digital Curation Across Disciplines,
+Elective,Digital Curation,INST 443 Tools and Methods for Digital Curation,
+Elective,Health Information,INST 402 Designing Patient-Centered Technologies,
+Elective,Health Information,INST 408A Consumer Health Informatics,
+Elective,Health Information,INST 452 Health Data Analytics,
