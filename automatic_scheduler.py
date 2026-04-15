@@ -1,12 +1,50 @@
-# Alden: I started on some core functionality for an automatic scheduler. This is a very basic implementation and can be expanded upon in 
-# the future.
-# Du: I added some methods and docstrings to exist classes.
-# and I also added a simple test case to check if the time conversion is working correctly.
+# Du:
+# - Implemented Person inheritance for Student/Advisor.
+# - Add new class AdvisorRecommendation to wrap Course objects.
+# - Added conflicts_with for future scheduling logic.
+# - A new class method from_csv_row is added to AdvisorRecommendation to create instances from CSV data.
 import sys
+import csv
+
+
+class Person:
+    """Parent class for all individuals in the system."""
+    def __init__(self, name, directory_id=None):
+        self.name = name
+        self.directory_id = directory_id
+
+class Student(Person):
+    """A Student is a Person who has a major and a list of completed courses."""
+    def __init__(self, name, major, directory_id=None, completed_courses=None):
+        super().__init__(name, directory_id)
+        self.major = major
+        if completed_courses:
+            self.completed_courses = completed_courses
+        else:
+            self.completed_courses = []
+
+    def check_if_can_take(self, course_object):
+        """
+        Checks if the student meets all prerequisites for a course.
+        
+        Returns:
+            bool: True if all prerequisites are met, False otherwise.
+        """
+        for pre in course_object.prerequisites:
+            if pre not in self.completed_courses:
+                return False
+        return True
+
+class Advisor(Person):
+    """An Advisor is a Person who provides course recommendations."""
+    def __init__(self, name, directory_id=None, department="iSchool"):
+        super().__init__(name, directory_id)
+        self.department = department
+
 
 class Course:
     def __init__(self, name, credits, prerequisites=None, semester_term=None, 
-                 section=None, time=None, dates=None):
+                 section=None, time=None, dates=None, category=None):
         """
         Initializes a Course instance.
 
@@ -20,24 +58,29 @@ class Course:
             dates (str): The days of the week (e.g., 'MWF').
         """
 
-        if prerequisites is None:
-            prerequisites = []
-
-       # If days is a string like "MWF", it converts to ['M', 'W', 'F'].
-        # This makes it easier to check if a course meets on a specific day.
-        if isinstance(dates, str):
-            self.dates = list(dates)
-        elif dates == None:
-            self.dates = []
-        else:
-            self.dates = dates
-
         self.name = name
         self.credits = credits
-        self.prerequisites = prerequisites
+
+        if prerequisites:
+            self.prerequisites = prerequisites
+        else:
+            self.prerequisites = []
+
         self.semester_term = semester_term
         self.section = section
         self.time = time
+
+        # If days is a string like "MWF", it converts to ['M', 'W', 'F'].
+        # This makes it easier to check if a course meets on a specific day.
+        if isinstance(dates, str):
+            self.dates = list(dates)
+        else:
+            if dates:
+                self.dates = dates
+            else:
+                self.dates = []
+
+        self.category = category
 
         # Convert time string to numeric minutes for conflict detection.
         self.start_minutes = self.convert_time_to_minutes(time)
@@ -52,7 +95,10 @@ class Course:
         Returns:
             int: Minutes since midnight.
         """
-        if time == None or "-" not in time:
+        if time is None:
+            return 0
+            
+        if "-" not in time:
             return 0
         
         # We use a try-except to ensure 
@@ -75,9 +121,48 @@ class Course:
             print(f"Warning: Could not parse time for {self.name}")
             return 0
         
+    def conflicts_with(self, other):
+        """Checks if this course conflicts with another based on days and time."""
+        
+        common_days = set(self.dates) & set(other.dates)
+        if common_days and self.start_minutes == other.start_minutes:
+            return True
+        return False
+    
     def __str__(self):
         """Returns a readable string of the course."""
         return f"Course: {self.name}, Section: {self.section}, Time: {self.time}"
+    
+
+class AdvisorRecommendation:
+    """
+    Wraps a Course object with advisor-specific priority.
+    This allows advisors to provide recommendations for students.
+    """
+    def __init__(self, course_obj, priority=1, notes=""):
+        self.course = course_obj
+        self.priority = priority
+        self.notes = notes
+
+    @classmethod
+    def from_csv_row(cls, row):
+        """
+        A factory method to create an instance from a CSV dictionary.
+        This is a class method because it acts on the class itself
+        to return a new object.
+        """
+        # We extract and convert data types here so the rest of the 
+        # program doesn't have to deal with raw CSV strings.
+        temp_course = Course(
+            name=row['course_name'],
+            credits=int(row['credits']),
+            category=row['category'],
+            dates=row.get('days', ""),
+            time=row.get('time', "")
+        )
+        return cls(temp_course, priority=int(row.get('priority', 1)), 
+                   notes=row.get('notes', ""))
+    
        
 class Major:
     def __init__(self, name, required_courses=None, elective_courses=None):
@@ -89,50 +174,23 @@ class Major:
             required_courses (list): Courses required for graduation.
             elective_courses (list): Available elective courses.
         """
-        if required_courses is None:
-            required_courses = []
-        if elective_courses is None:
-            elective_courses = []
         self.name = name
-        self.required_courses = required_courses
-        self.elective_courses = elective_courses
 
-
-class Student:
-    def __init__(self, name, major, completed_courses=None):
-        """
-        Initializes a Student instance.
-
-        Args:
-            name (str): The student's name.
-            major (str): The student's major.
-            completed_courses (list): Courses student finished.
-        """
-        if completed_courses is None:
-            completed_courses = []
-        self.name = name
-        self.major = major
-        self.completed_courses = completed_courses
-
-    def check_if_can_take(self, course_object):
-        """
-        Checks if the student meets all prerequisites for a course.
-        
-        Args:
-            course_object (Course): The course the student wants to take.
+        if required_courses:
+            self.required_courses = required_courses
+        else:
+            self.required_courses = []
             
-        Returns:
-            bool: True if all prerequisites are met, False otherwise.
-        """
-        for pre in course_object.prerequisites:
-            if pre not in self.completed_courses:
-                return False
-        return True
-    
+        if elective_courses:
+            self.elective_courses = elective_courses
+        else:
+            self.elective_courses = []
+
 
 if __name__ == "__main__":
     print("Academic Scheduler Data Model loaded successfully.")
     
     # Simple test case
-    test_course = Course("INST326", 3, time="14:00-15:15", prerequisites=["INST126"])
+    test_course = Course("INST326", 3, time="14:00-15:15", 
+                         prerequisites=["INST126"])
     print(f"Test Course: {test_course.name}, Start Minutes: {test_course.start_minutes}")
