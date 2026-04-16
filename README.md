@@ -6,6 +6,7 @@ A group project for INST 326 final.
 - Yuanfeng Du
 - Alden Arce-Romero
 - Christopher Caballero
+- Christian Ahaghotu
 
 ## How to set up
 
