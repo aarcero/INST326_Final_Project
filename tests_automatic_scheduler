@@ -1,3 +1,5 @@
+from automatic_scheduler import Course, Student
+
 
 def test_can_student_take_course_with_all_prereqs():
     student = Student("John", "InfoSci", completed_courses=["INST126"])
@@ -11,7 +13,7 @@ def test_can_student_take_course_with_no_prereqs():
 
 def test_valid_time_conversion():
     course = Course("INST326", 3, time="12:00-1:15")
-    assert course.start_minutes == 630
+    assert course.start_minutes == 720
 
 def test_invalid_time_format():
     course = Course("INST326", 3, time="invalid")
