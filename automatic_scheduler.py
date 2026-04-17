@@ -1,5 +1,24 @@
 import sys
 import csv
+import re
+
+def extract_course_code(course_name):
+    match = re.search(r'([A-Z]+\s?\d+[A-Z]?)', course_name)
+    """
+    Uses re.search to find the first occurrence of a course code pattern
+    within the input string.
+
+    The regular expression '([A-Z]+\s?\d+[A-Z]?)' matches:
+    - [A-Z]+: One or more uppercase letters (the department code).
+    - \s?: An optional space (some course codes have a space, e.g., "INST 126").
+    - \d+: One or more digits (the course number).
+    - [A-Z]?: An optional uppercase letter (for courses like "MATH115A").
+    The parentheses create a capture group, allowing the matched course code
+    to be extracted using match.group(1).
+    """
+    if match:
+        return match.group(1).replace(" ", "")
+    return course_name
 
 class Person:
     """Parent class for all individuals in the system."""
@@ -149,8 +168,16 @@ class AdvisorRecommendation:
             credits_val = 0
 
         # Create the Course object using CSV column names
+        raw_name = row.get('Course', '').strip()
+
+        if not raw_name:
+            print("DEBUG: Missing course name in row:", row)
+            raw_name = "Unknown Course"
+
+        course_code = extract_course_code(raw_name)
+
         temp_course = Course(
-            name=row.get('Course', 'Unknown Course').strip(),
+            name=course_code,
             credits=credits_val
         )
         
@@ -167,25 +194,21 @@ class AdvisorRecommendation:
             
         return cls(temp_course, category_val, row.get('Subcategory'), priority_val)
     
-
 def load_courses_from_csv(file_path):
     """Loads course data and returns AdvisorRecommendation objects."""
     recommendations = []
     try:
         with open(file_path, mode='r', encoding='utf-8') as csvfile:
-            # IMPORTANT: Skip the title row "infosci_program" to reach headers
-            next(csvfile) 
-            
             reader = csv.DictReader(csvfile)
+
             for row in reader:
-                # Use your factory method here!
                 rec = AdvisorRecommendation.from_csv_row(row)
                 recommendations.append(rec)
+
     except FileNotFoundError:
         print(f"Error: {file_path} not found.")
     except Exception as e:
         print(f"An error occurred: {e}")
-    
     return recommendations
 
 if __name__ == "__main__":
