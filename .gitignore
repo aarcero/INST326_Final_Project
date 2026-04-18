@@ -2,3 +2,4 @@ venv/
 __pycache__/
 *.pyc
 
+#This is for Alden. I am on linux mint and I need this so that my virtual environment and pycache files are not tracked by git.

@@ -49,3 +49,10 @@ whenever there are changes that other team members have created, to receive them
    git pull
 
 The changes will show up locally for you.
+
+---------------------------------------
+# REQUIREMNTS TO RUN PROGRAM
+
+
+Requirements:
+pip install requests
