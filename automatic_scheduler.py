@@ -1,9 +1,9 @@
 import sys
 import csv
 import re
+import requests
 
 def extract_course_code(course_name):
-    match = re.search(r'([A-Z]+\s?\d+[A-Z]?)', course_name)
     """
     Uses re.search to find the first occurrence of a course code pattern
     within the input string.
@@ -15,10 +15,35 @@ def extract_course_code(course_name):
     - [A-Z]?: An optional uppercase letter (for courses like "MATH115A").
     The parentheses create a capture group, allowing the matched course code
     to be extracted using match.group(1).
+
+    Uses the resource  https://www.geeksforgeeks.org/python/python-extract-words-from-given-string/  for regular expression syntax and 
+    usage as well as https://www.w3schools.com/python/python_regex.asp for additional regex examples and explanations.
     """
+    match = re.search(r'([A-Z]+\s?\d+[A-Z]?)', course_name)
     if match:
         return match.group(1).replace(" ", "")
     return course_name
+
+def grab_umd_courses(department="INST", semester="202408"):
+
+    """Fetches course data from the UMD API for a given department and semester. Uses the resource
+    at https://api.umd.io/v1/courses?department=DEPT&semester=SEMESTER, where DEPT is the department code
+    (e.g., "INST") and SEMESTER is the semester code (e.g., "202408" for Fall 2024). Also uses 
+    https://www.cbtnuggets.com/blog/technology/programming for understanding how to make API requests in Python using the requests library.
+        department (str): The department code to filter courses (default is "INST").
+        semester (str): The semester code to filter courses (default is "202408" for Fall 2024).
+    Returns:
+        list: A list of course data in JSON format if the request is successful, otherwise an empty list.
+    """
+    url = f"https://api.umd.io/v1/courses?department={department}&semester={semester}"
+    
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print("Error fetching courses:", response.status_code)
+        return []
 
 class Person:
     """Parent class for all individuals in the system."""
@@ -148,7 +173,6 @@ class Major:
         self.required_courses = required_courses
         self.elective_courses = elective_courses
 
-
 class AdvisorRecommendation:
     """Wraps a Course object with advisor-specific details using composition."""
     def __init__(self, course_obj, category=None, subcategory=None, priority=1):
@@ -193,7 +217,30 @@ class AdvisorRecommendation:
                 priority_val = 1
             
         return cls(temp_course, category_val, row.get('Subcategory'), priority_val)
-    
+
+def convert_api_to_courses(api_data):
+    """
+    Converts UMD API JSON data into a list of Course objects.
+    """
+    course_objects = []
+
+    for item in api_data:
+        try:
+            name = item.get("course_id", "Unknown")
+            credits = item.get("credits", 0)
+
+            course = Course(
+                name=name,
+                credits=credits
+            )
+
+            course_objects.append(course)
+
+        except Exception as e:
+            print("Error converting course:", item, e)
+
+    return course_objects
+
 def load_courses_from_csv(file_path):
     """Loads course data and returns AdvisorRecommendation objects."""
     recommendations = []
@@ -217,18 +264,34 @@ if __name__ == "__main__":
     test_course = Course("INST326", 3, time="14:00-15:15", prerequisites=["INST126"])
     print(f"[TEST] {test_course.name} starts at {test_course.start_minutes} minutes\n")
 
+    # Loading advisor CSV data
     file_path = "infosci_program.csv"
-
     courses = load_courses_from_csv(file_path)
-    print(f"Loaded {len(courses)} courses.\n")
+    print(f"Loaded {len(courses)} courses from CSV.\n")
 
+    # Fetching API data
+    courses_data = grab_umd_courses()
+    print(f"Fetched {len(courses_data)} courses from UMD API.\n")
+
+    # Converting API data to Course objects
+    api_courses = convert_api_to_courses(courses_data)
+    print(f"Converted {len(api_courses)} API courses into Course objects.\n")
+
+    # Creating a test student with some completed courses
     student = Student(
         name="Test Student",
         major="InfoSci",
         completed_courses=["INST126", "MATH115"]
     )
 
-    print("Courses student can take:\n")
+    # Show advisor-recommended courses the student can take
+    print("Courses from advisor plan student can take:\n")
     for rec in courses:
         if student.check_if_can_take(rec.course):
             print(f"{rec.course} (Priority: {rec.priority})")
+
+    # Show API courses the student can take
+    print("\nAPI Courses student can take:\n")
+    for course in api_courses:
+        if student.check_if_can_take(course):
+            print(course)
