@@ -5,16 +5,21 @@ import requests
 
 def extract_course_code(course_name):
     """
-    Uses re.search to find the first occurrence of a course code pattern
-    within the input string.
+    Extracts a standardized course code from a course name string.
 
-    The regular expression '([A-Z]+\s?\d+[A-Z]?)' matches:
-    - [A-Z]+: One or more uppercase letters (the department code).
-    - \s?: An optional space (some course codes have a space, e.g., "INST 126").
-    - \d+: One or more digits (the course number).
-    - [A-Z]?: An optional uppercase letter (for courses like "MATH115A").
-    The parentheses create a capture group, allowing the matched course code
-    to be extracted using match.group(1).
+    Supports formats such as:
+    - INST326
+    - INST 326
+    - INST326A
+
+    explained regex patterns:
+    - [A-Z]+: Matches one or more uppercase letters (the department code).
+    - \s?: Optionally matches a single space (to allow for formats like "INST 326").
+    - \d+: Matches one or more digits (the course number).
+    - [A-Z]?: Optionally matches a single uppercase letter (for course variations like "INST326A").
+
+    Returns:
+        str: Cleaned course code without spaces.
 
     Uses the resource  https://www.geeksforgeeks.org/python/python-extract-words-from-given-string/  for regular expression syntax and 
     usage as well as https://www.w3schools.com/python/python_regex.asp for additional regex examples and explanations.
@@ -24,16 +29,18 @@ def extract_course_code(course_name):
         return match.group(1).replace(" ", "")
     return course_name
 
-def grab_umd_courses(department="INST", semester="202408"):
+def grab_umd_courses(department="INST", semester="202408"): 
+    """
+    Fetches course data from the UMD API for a given department and semester.
 
-    """Fetches course data from the UMD API for a given department and semester. Uses the resource
-    at https://api.umd.io/v1/courses?department=DEPT&semester=SEMESTER, where DEPT is the department code
+    Returns:
+        list: JSON response containing course data if successful, otherwise empty list.
+    
+    Uses the resource https://api.umd.io/v1/courses?department=DEPT&semester=SEMESTER, where DEPT is the department code
     (e.g., "INST") and SEMESTER is the semester code (e.g., "202408" for Fall 2024). Also uses 
     https://www.cbtnuggets.com/blog/technology/programming for understanding how to make API requests in Python using the requests library.
         department (str): The department code to filter courses (default is "INST").
         semester (str): The semester code to filter courses (default is "202408" for Fall 2024).
-    Returns:
-        list: A list of course data in JSON format if the request is successful, otherwise an empty list.
     """
     url = f"https://api.umd.io/v1/courses?department={department}&semester={semester}"
     
@@ -45,6 +52,23 @@ def grab_umd_courses(department="INST", semester="202408"):
         print("Error fetching courses:", response.status_code)
         return []
 
+def build_semester_code(year, term):
+    """
+    Converts a year + term into a UMD API semester code.
+    """
+    term_map = {
+        "spring": "01",
+        "summer": "05",
+        "fall": "08"
+    }
+
+    term = term.strip().lower()
+
+    if term not in term_map:
+        raise ValueError("Invalid term. Choose Spring, Summer, or Fall.")
+
+    return f"{year}{term_map[term]}"
+
 class Person:
     """Parent class for all individuals in the system."""
     def __init__(self, name, directory_id=None):
@@ -52,7 +76,17 @@ class Person:
         self.directory_id = directory_id
 
 class Student(Person):
-    """A Student is a Person who has a major and a list of completed courses."""
+    """
+    Determines whether a student is eligible to take a course based on prerequisites.
+
+    Prerequisite formats supported:
+    - AND logic: "INST126,INST201"
+    - OR logic: "INST126|INST201"
+    - Course level requirement: "INST200+"
+
+    Returns:
+        bool: True if all prerequisite groups are satisfied, False otherwise.
+    """
     def __init__(self, name, major, directory_id=None, completed_courses=None):
         super().__init__(name, directory_id)
         self.major = major
@@ -62,15 +96,50 @@ class Student(Person):
             self.completed_courses = []
 
     def check_if_can_take(self, course_object):
-        """
-        Checks if the student meets all prerequisites for a course.
+        prerequisites = course_object.prerequisites
+
+        #not all courses have prerequisites, so we check if the list is empty first
+        if not prerequisites:
+            return True
         
-        Returns:
-            bool: True if all prerequisites are met, False otherwise.
-        """
-        for pre in course_object.prerequisites:
-            if pre not in self.completed_courses:
-                return False
+        if isinstance(prerequisites, list):
+            and_group = prerequisites
+        else:
+            and_group = prerequisites.split(",")
+
+        for group in and_group:
+            group = group.strip()
+
+            options = group.split("|")
+
+            satisfied = False
+
+            for option in options:
+                option = option.strip()
+                
+                if option.endswith("+"):
+                    base_course = option[:-1]
+
+                    for completed in self.completed_courses:
+                        if completed.startswith(base_course[:4]):
+                            try:
+                                if int(completed[4:]) >= int(base_course[4:]):
+                                    satisfied = True
+                                    break
+                            except:
+                                continue
+
+                else:
+                    for completed in self.completed_courses:
+                        if completed.startswith(option):
+                            satisfied = True
+                            break
+                
+                if satisfied:
+                    break
+
+            if not satisfied:
+                return False           
         return True
 
 class Advisor(Person):
@@ -120,13 +189,13 @@ class Course:
 
     def convert_time_to_minutes(self, time):
         """
-        Converts the start time from the time string into minutes.
-        
-        Args:
-            time (str): The time range string (e.g., '10:30-12:00').
-            
+        Converts a course start time into minutes since midnight.
+
+        Expected format:
+            "HH:MM-HH:MM"
+
         Returns:
-            int: Minutes since midnight.
+            int: Start time in minutes, or 0 if invalid format.
         """
         if time is None or "-" not in time:
             return 0
@@ -183,51 +252,60 @@ class AdvisorRecommendation:
 
     @classmethod
     def from_csv_row(cls, row):
-        """Factory method to create a recommendation from a CSV dictionary row."""
-        try:
-            # Strip whitespace and handle potential missing keys
-            raw_credits = row.get('Credits', '0').strip()
-            credits_val = int(raw_credits) if raw_credits.isdigit() else 0
-        except ValueError:
-            credits_val = 0
+        # Get values from CSV (MATCHES YOUR HEADER EXACTLY)
+        raw_credits = row.get("Credits", "0").strip()
+        credits_value = int(raw_credits) if raw_credits.isdigit() else 0
 
-        # Create the Course object using CSV column names
-        raw_name = row.get('Course', '').strip()
-
-        if not raw_name:
-            print("DEBUG: Missing course name in row:", row)
-            raw_name = "Unknown Course"
-
+        raw_name = row.get("Course", "").strip()
         course_code = extract_course_code(raw_name)
 
+        prereq_string = row.get("Prerequisites", "").strip()
+        category_value = row.get("Category", "General").strip()
+
+        # Create Course object
         temp_course = Course(
             name=course_code,
-            credits=credits_val
+            credits=credits_value,
+            prerequisites=prereq_string
         )
-        
-        category_val = row.get('Category', 'General').strip()
-        
+
         # Priority logic
-        if "Benchmark" in category_val:
-            priority_val = 3
+        if "Benchmark" in category_value:
+            priority_value = 3
+        elif "Core" in category_value:
+            priority_value = 2
         else:
-            if "Core" in category_val:
-                priority_val = 2
-            else:
-                priority_val = 1
-            
-        return cls(temp_course, category_val, row.get('Subcategory'), priority_val)
+            priority_value = 1
+        return cls(
+            temp_course,
+            category_value,
+            row.get("Subcategory", "").strip(),
+            priority_value
+        )
 
 def convert_api_to_courses(api_data):
     """
-    Converts UMD API JSON data into a list of Course objects.
+    Converts raw UMD API course data into Course objects.
+
+    Handles:
+    - Missing or malformed credit values
+    - Default credit fallback (3 credits)
+    - Extraction of course ID from API response
+
+    Returns:
+        list[Course]: List of Course objects created from API data.
     """
     course_objects = []
 
     for item in api_data:
         try:
             name = item.get("course_id", "Unknown")
-            credits = item.get("credits", 0)
+
+            raw_credits = item.get("credits", "0")
+            try:
+                credits = int(float(raw_credits))
+            except:
+                credits = 3
 
             course = Course(
                 name=name,
@@ -264,34 +342,143 @@ if __name__ == "__main__":
     test_course = Course("INST326", 3, time="14:00-15:15", prerequisites=["INST126"])
     print(f"[TEST] {test_course.name} starts at {test_course.start_minutes} minutes\n")
 
-    # Loading advisor CSV data
+    # Loading CSV data
     file_path = "infosci_program.csv"
     courses = load_courses_from_csv(file_path)
     print(f"Loaded {len(courses)} courses from CSV.\n")
 
+    # Creating a test student with some completed courses
+
+    student_name = input("Enter your name: ").strip()
+
+    has_csv = input("Do you have a 4-year plan CSV? (yes/no): ").strip().lower()
+
+    if has_csv == "yes":
+        advisor_name = input("Enter your advisor's name: ").strip()
+        file_path = input("Enter the path to your CSV file: ").strip()
+    else:
+        advisor_name = "Default Advisor"
+        file_path = "infosci_program.csv"
+
+    # Load courses from CSV
+    courses = load_courses_from_csv(file_path)
+    print(f"Loaded {len(courses)} courses from CSV.\n")
+
+    #Extra courses not in CSV but in API
+    csv_course_names = {rec.course.name for rec in courses}
+
+    # Ask academic standing
+    print("\n--- Semester Selection ---")
+
+    year = input("Enter year (e.g., 2026): ").strip()
+
+    print("\nSelect term:")
+    print("1. Spring")
+    print("2. Summer")
+    print("3. Fall")
+
+    term_choice = input("Enter choice (1/2/3): ").strip()
+
+    term_map_choice = {
+        "1": "spring",
+        "2": "summer",
+        "3": "fall"
+    }
+
+    if term_choice not in term_map_choice:
+        print("Invalid choice. Defaulting to Fall.")
+        term = "fall"
+    else:
+        term = term_map_choice[term_choice]
+
+    semester = build_semester_code(year, term)
+
+    print(f"\nSelected semester: {semester}")
+
     # Fetching API data
-    courses_data = grab_umd_courses()
+    courses_data = grab_umd_courses(semester=semester)
     print(f"Fetched {len(courses_data)} courses from UMD API.\n")
 
     # Converting API data to Course objects
     api_courses = convert_api_to_courses(courses_data)
     print(f"Converted {len(api_courses)} API courses into Course objects.\n")
 
-    # Creating a test student with some completed courses
+
+    # Ask completed courses
+    completed_input = input("Enter completed courses separated by commas (e.g., INST126,MATH115): ")
+    completed_courses = [c.strip().upper() for c in completed_input.split(",") if c.strip()]
+
+    # Create student
     student = Student(
-        name="Test Student",
+        name=student_name,
         major="InfoSci",
-        completed_courses=["INST126", "MATH115"]
+        completed_courses=completed_courses
     )
 
     # Show advisor-recommended courses the student can take
-    print("Courses from advisor plan student can take:\n")
-    for rec in courses:
-        if student.check_if_can_take(rec.course):
-            print(f"{rec.course} (Priority: {rec.priority})")
+    print("Courses from advisor plan student can take (max 15 credits):\n")
+
+    selected_courses = []
+    total_credits = 0
+    MAX_CREDITS = 15
+
+    """
+    Lamba functions are anonymous functions defined with the lambda keyword. In this code, we use a lambda function as the key for sorting 
+    the courses based on their priority.
+
+    3 is the highest priority (Benchmark),
+    2 is the next (Core),
+    1 is the lowest (General).
+    
+    By sorting in reverse order, we ensure that courses with higher priority are considered first when building the schedule.
+
+    reverse = true means that the sorting will be done in descending order, so courses with higher priority (like Benchmark) will come before
+    lower priority courses (like General).
+
+    Learned how to use lambda from https://www.w3schools.com/python/python_lambda.asp.
+    """
+
+    sorted_courses = sorted(courses, key=lambda x: x.priority, reverse=True)
+
+    for rec in sorted_courses:
+        course = rec.course
+
+        # Skip completed courses
+        if course.name in student.completed_courses:
+            continue
+
+        # Check prereqs
+        if not student.check_if_can_take(course):
+            continue
+
+        # Default credits safety
+        credits = course.credits if course.credits else 3
+
+        # Stop if adding exceeds limit
+        if total_credits + credits > MAX_CREDITS:
+            continue
+
+        selected_courses.append(rec)
+        total_credits += credits
+
+    # Print final schedule
+    for rec in selected_courses:
+        print(f"{rec.course} (Credits: {rec.course.credits}, Priority: {rec.priority})")
+
+    print(f"\nTotal Credits: {total_credits}")
 
     # Show API courses the student can take
-    print("\nAPI Courses student can take:\n")
     for course in api_courses:
+        if not course.name.startswith("INST"):
+            continue
+
+        if course.name not in csv_course_names:
+            print(f"API course not in CSV: {course.name} (Ask advisor if this is a good option for the student.)")
+            continue
+
+    # Skip completed
+        if course.name in student.completed_courses:
+            continue
+
         if student.check_if_can_take(course):
-            print(course)
+            print(f"Student can take API course: {course.name}")

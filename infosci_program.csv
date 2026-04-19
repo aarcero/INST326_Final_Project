@@ -1,37 +1,35 @@
-Category,Subcategory,Course,Credits
-General,General Education,General Education Total,40
-Major,InfoSci Major Total,InfoSci Major,45
-Benchmark I,Requirement,MATH 115 (or higher) – Precalculus,3
-Benchmark I,Requirement,PSYC 100 – Introduction to Psychology,3
-Benchmark II,Requirement,STAT 100 – Elementary Statistics and Probability,3
-Benchmark II,Requirement,INST 126 – Intro to Programming for Information Science,3
-Benchmark II,Requirement,INST 201 – Introduction to Information Science,3
-Core,INST Core,INST 201 Introduction to Information Science,
-Core,INST Core,INST 311 Information Organization,
-Core,INST Core,INST 314 Statistics for Information Science,
-Core,INST Core,INST 326 Object-Oriented Programming for Information Science,
-Core,INST Core,INST 327 Database Design and Modeling,
-Core,INST Core,INST 335 Teams and Organizations,
-Core,INST Core,"INST 346 Technologies, Infrastructures and Architecture",
-Core,INST Core,INST 352 Information User Needs and Assessment,
-Core,INST Core,INST 362 User-Centered Design,
-Core,INST Core,INST 490 Integrative Capstone,
-Elective,Cybersecurity & Privacy,INST 364 Human-Centered Cybersecurity,
-Elective,Cybersecurity & Privacy,INST 365 Ethical Hacking,
-Elective,Cybersecurity & Privacy,"INST 366 Privacy, Security, and Ethics for Big Data",
-Elective,Cybersecurity & Privacy,INST 464 Decision-Making for Cybersecurity,
-Elective,Cybersecurity & Privacy,"INST 466 Technology, Culture, and Society",
-Elective,Cybersecurity & Privacy,INST 467 Practical Hacking for Policy Making,
-Elective,Data Science,INST 354 Decision-Making for Information Science,
-Elective,Data Science,INST 377 Dynamic Web Applications,
-Elective,Data Science,INST 410 Managing with Data and Simulations,
-Elective,Data Science,INST 414 Advanced Data Science,
-Elective,Data Science,INST 447 Data Sources and Manipulation,
-Elective,Data Science,INST 462 Introduction to Data Visualization,
-Elective,Digital Curation,INST 341 Introduction to Digital Curation,
-Elective,Digital Curation,INST 441 Information Ethics and Policy,
-Elective,Digital Curation,INST 442 Digital Curation Across Disciplines,
-Elective,Digital Curation,INST 443 Tools and Methods for Digital Curation,
-Elective,Health Information,INST 402 Designing Patient-Centered Technologies,
-Elective,Health Information,INST 408A Consumer Health Informatics,
-Elective,Health Information,INST 452 Health Data Analytics,
+Course,Credits,Category,Prerequisites,SpecialPermission
+MATH115,3,Benchmark,,
+PSYC100,3,Benchmark,,
+STAT100,3,Benchmark,"MATH115",
+INST126,3,Benchmark,,
+INST201,3,Benchmark,,
+
+INST311,3,Core,"PSYC100|SOCY105",
+INST314,3,Core,"INST126,STAT100|MATH115",
+INST326,3,Core,"INST126|GEOG276",
+INST327,3,Core,"INST126|BSOS233|GEOG276",
+INST335,3,Core,"INST201|INST301,PSYC100",
+INST346,3,Core,"INST201|INST301,INST326,INST327",Yes
+INST352,3,Core,"INST201|INST301,INST311",
+INST362,3,Core,"INST201|INST301,PSYC100|SOCY105,INST326,STAT100",
+INST490,3,Core,"INST311,INST314,INST326,INST327,INST335,INST346,INST352,INST362",Yes
+
+INST354,3,Elective,"INST201|INST301,INST314,PSYC100",
+INST377,3,Elective,"INST201|INST301|BSOS233,INST327,STAT100,MATH115+",
+INST410,3,Elective,"INST126,STAT100,PSYC100|SOCY105,INST201|INST301,MATH115+",
+INST414,3,Elective,"MATH115+,STAT100,INST126|GEOG276,INST201|INST301|BSOS233,AASP101|ANTH210|ANTH260|ECON200|ECON201|GEOG202|GVPT170|PSYC100|SOCY100,BSOS233|INST314",
+INST447,3,Elective,"STAT100,INST327,INST201|INST301|BSOS233,AASP101|ANTH210|ANTH260|ECON200|ECON201|GEOG202|GVPT170|PSYC100|SOCY100|SOCY105,AASP210|ECON230|GEOG306|GVPT201|INST314|PSYC200|SOCY201,BSOS326|INST326",
+INST462,3,Elective,"STAT100,INST201|INST301|BSOS233,INST126|GEOG276,AASP101|ANTH210|ANTH260|ECON200|ECON201|GEOG202|GVPT170|PSYC100|SOCY100|SOCY105,BSOS233|INST314",
+
+INST341,3,Elective,"INST311",
+INST441,3,Elective,"INST341|INST380",
+INST442,3,Elective,"INST342|INST380",
+
+INST402,3,Elective,"INST362|INST367",
+INST408,3,Elective,"INST362|INST367",
+
+INST364,3,Elective,"INST201|INST301,INST327,STAT100,MATH115,PSYC100",
+INST366,3,Elective,"INST126|GEOG276|BSOS233,STAT100,AASP101|ANTH210|ANTH260|ECON200|ECON201|GEOG202|GVPT170|PSYC100|SOCY100|SOCY105",
+INST464,3,Elective,"INST201,INST126,MATH115,PSYC100,INST364",
+INST466,3,Elective,"INST201|INST301,PSYC100|SOCY105"
