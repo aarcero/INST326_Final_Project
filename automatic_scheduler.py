@@ -1,6 +1,8 @@
 import sys
 import csv
 import re
+import json
+import datetime
 import requests
 
 def extract_course_code(course_name):
@@ -220,6 +222,15 @@ class Course:
             print(f"Warning: Could not parse time for {self.name}")
             return 0
         
+    def is_conflicting(self, other_course):
+        """check if this course conflicts with another course based on time and days."""
+        # check if they have any common days
+        common_days = set(self.dates) & set(other_course.dates)
+        if not common_days:
+            return False
+    
+        return self.start_minutes == other_course.start_minutes
+        
     def __str__(self):
         """Returns a readable string of the course."""
         return f"Course: {self.name}, Section: {self.section}, Time: {self.time}"
@@ -335,6 +346,53 @@ def load_courses_from_csv(file_path):
     except Exception as e:
         print(f"An error occurred: {e}")
     return recommendations
+
+def save_schedule(selected_courses, student_name, filename=None):
+    """
+    Optimized saving function:
+    1. Generates a timestamped filename to prevent overwriting.
+    2. Includes a metadata summary for audit/tracking.
+    3. Handles file I/O errors gracefully.
+    """
+    # Generate filename (e.g., Yuanfeng_Schedule_20260420.json)
+    if not filename:
+        date_str = datetime.datetime.now().strftime("%Y%m%d")
+        filename = f"{student_name.replace(' ', '_')}_Schedule_{date_str}.json"
+    
+    # Calculate total credits for the summary
+    total_credits = sum(int(rec.course.credits) for rec in selected_courses)
+    
+    # Construct structured output
+    output_data = {
+        "metadata": {
+            "student_name": student_name,
+            "export_date": str(datetime.datetime.now()),
+            "course_count": len(selected_courses),
+            "total_credits": total_credits
+        },
+        "proposed_schedule": []
+    }
+    
+    for rec in selected_courses:
+        output_data["proposed_schedule"].append({
+            "course_id": rec.course.name,
+            "credits": rec.course.credits,
+            "category": rec.category,
+            "priority_level": rec.priority,
+            "time_info": rec.course.time if hasattr(rec.course, 'time') else "N/A"
+        })
+    
+    # Write to file and provide feedback
+    try:
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(output_data, f, indent=4)
+        print("\n" + "="*40)
+        print("SUCCESS: Schedule exported successfully!")
+        print(f"File saved as: {filename}")
+        print(f"Summary: {len(selected_courses)} courses, {total_credits} credits total.")
+        print("="*40)
+    except IOError as e:
+        print(f"\nERROR: Failed to write to file: {e}")
 
 if __name__ == "__main__":
     print("Academic Scheduler starting\n")
@@ -482,3 +540,10 @@ if __name__ == "__main__":
 
         if student.check_if_can_take(course):
             print(f"Student can take API course: {course.name}")
+
+    # Save schedule to file    
+    if selected_courses:
+        save_choice = input("\nWould you like to export this schedule to JSON? (y/n): ").lower().strip()
+        if save_choice == 'y':
+            # Call the function
+            save_schedule(selected_courses, student_name)
