@@ -277,3 +277,243 @@ def convert_api_to_courses(api_data):
         list[Course]: List of Course objects created from API data.
     """
     course_objects = []
+
+    for item in api_data:
+        try:
+            name = item.get("course_id", "Unknown")
+
+            raw_credits = item.get("credits", "0")
+            try:
+                credits = int(float(raw_credits))
+            except:
+                credits = 3
+
+            course = Course(
+                name=name,
+                credits=credits
+            )
+
+            course_objects.append(course)
+
+        except Exception as e:
+            print("Error converting course:", item, e)
+
+    return course_objects
+
+def load_courses_from_csv(file_path):
+    """Loads course data and returns AdvisorRecommendation objects."""
+    recommendations = []
+    try:
+        with open(file_path, mode='r', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+
+            for row in reader:
+                rec = AdvisorRecommendation.from_csv_row(row)
+                recommendations.append(rec)
+
+    except FileNotFoundError:
+        print(f"Error: {file_path} not found.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    return recommendations
+
+def save_schedule(selected_courses, student_name, filename=None):
+    """
+    Optimized saving function:
+    1. Generates a timestamped filename to prevent overwriting.
+    2. Includes a metadata summary for audit/tracking.
+    3. Handles file I/O errors gracefully.
+    """
+    # Generate filename (e.g., Yuanfeng_Schedule_20260420.json)
+    if not filename:
+        date_str = datetime.datetime.now().strftime("%Y%m%d")
+        filename = f"{student_name.replace(' ', '_')}_Schedule_{date_str}.json"
+    
+    # Calculate total credits for the summary
+    total_credits = sum(int(rec.course.credits) for rec in selected_courses)
+    
+    # Construct structured output
+    output_data = {
+        "metadata": {
+            "student_name": student_name,
+            "export_date": str(datetime.datetime.now()),
+            "course_count": len(selected_courses),
+            "total_credits": total_credits
+        },
+        "proposed_schedule": []
+    }
+    
+    for rec in selected_courses:
+        output_data["proposed_schedule"].append({
+            "course_id": rec.course.name,
+            "credits": rec.course.credits,
+            "category": rec.category,
+            "priority_level": rec.priority,
+            "time_info": rec.course.time if hasattr(rec.course, 'time') else "N/A"
+        })
+    
+    # Write to file and provide feedback
+    try:
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(output_data, f, indent=4)
+        print("\n" + "="*40)
+        print("SUCCESS: Schedule exported successfully!")
+        print(f"File saved as: {filename}")
+        print(f"Summary: {len(selected_courses)} courses, {total_credits} credits total.")
+        print("="*40)
+    except IOError as e:
+        print(f"\nERROR: Failed to write to file: {e}")
+
+if __name__ == "__main__":
+    print("Academic Scheduler starting\n")
+
+    test_course = Course("INST326", 3, time="14:00-15:15", prerequisites=["INST126"])
+    print(f"[TEST] {test_course.name} starts at {test_course.start_minutes} minutes\n")
+
+    # Loading CSV data
+    file_path = "infosci_program.csv"
+    courses = load_courses_from_csv(file_path)
+    print(f"Loaded {len(courses)} courses from CSV.\n")
+
+    # Creating a test student with some completed courses
+
+    student_name = input("Enter your name: ").strip()
+
+    has_csv = input("Do you have a 4-year plan CSV? (yes/no): ").strip().lower()
+
+    if has_csv == "yes":
+        advisor_name = input("Enter your advisor's name: ").strip()
+        file_path = input("Enter the path to your CSV file: ").strip()
+    else:
+        advisor_name = "Default Advisor"
+        file_path = "infosci_program.csv"
+
+    # Load courses from CSV
+    courses = load_courses_from_csv(file_path)
+    print(f"Loaded {len(courses)} courses from CSV.\n")
+
+    #Extra courses not in CSV but in API
+    csv_course_names = {rec.course.name for rec in courses}
+
+    # Ask academic standing
+    print("\n--- Semester Selection ---")
+
+    year = input("Enter year (e.g., 2026): ").strip()
+
+    print("\nSelect term:")
+    print("1. Spring")
+    print("2. Summer")
+    print("3. Fall")
+
+    term_choice = input("Enter choice (1/2/3): ").strip()
+
+    term_map_choice = {
+        "1": "spring",
+        "2": "summer",
+        "3": "fall"
+    }
+
+    if term_choice not in term_map_choice:
+        print("Invalid choice. Defaulting to Fall.")
+        term = "fall"
+    else:
+        term = term_map_choice[term_choice]
+
+    semester = build_semester_code(year, term)
+
+    print(f"\nSelected semester: {semester}")
+
+    # Fetching API data
+    courses_data = grab_umd_courses(semester=semester)
+    print(f"Fetched {len(courses_data)} courses from UMD API.\n")
+
+    # Converting API data to Course objects
+    api_courses = convert_api_to_courses(courses_data)
+    print(f"Converted {len(api_courses)} API courses into Course objects.\n")
+
+
+    # Ask completed courses
+    completed_input = input("Enter completed courses separated by commas (e.g., INST126,MATH115): ")
+    completed_courses = [c.strip().upper() for c in completed_input.split(",") if c.strip()]
+
+    # Create student
+    student = Student(
+        name=student_name,
+        major="InfoSci",
+        completed_courses=completed_courses
+    )
+
+    # Show advisor-recommended courses the student can take
+    print("Courses from advisor plan student can take (max 15 credits):\n")
+
+    selected_courses = []
+    total_credits = 0
+    MAX_CREDITS = 15
+
+    """
+    Lamba functions are anonymous functions defined with the lambda keyword. In this code, we use a lambda function as the key for sorting 
+    the courses based on their priority.
+
+    3 is the highest priority (Benchmark),
+    2 is the next (Core),
+    1 is the lowest (General).
+    
+    By sorting in reverse order, we ensure that courses with higher priority are considered first when building the schedule.
+
+    reverse = true means that the sorting will be done in descending order, so courses with higher priority (like Benchmark) will come before
+    lower priority courses (like General).
+
+    Learned how to use lambda from https://www.w3schools.com/python/python_lambda.asp.
+    """
+
+    sorted_courses = sorted(courses, key=lambda x: x.priority, reverse=True)
+
+    for rec in sorted_courses:
+        course = rec.course
+
+        # Skip completed courses
+        if course.name in student.completed_courses:
+            continue
+
+        # Check prereqs
+        if not student.check_if_can_take(course):
+            continue
+
+        # Default credits safety
+        credits = course.credits if course.credits else 3
+
+        # Stop if adding exceeds limit
+        if total_credits + credits > MAX_CREDITS:
+            continue
+
+        selected_courses.append(rec)
+        total_credits += credits
+
+    # Print final schedule
+    for rec in selected_courses:
+        print(f"{rec.course} (Credits: {rec.course.credits}, Priority: {rec.priority})")
+
+    print(f"\nTotal Credits: {total_credits}")
+
+    # Show API courses the student can take
+    for course in api_courses:
+        if not course.name.startswith("INST"):
+            continue
+
+        if course.name not in csv_course_names:
+            print(f"API course not in CSV: {course.name} (Ask advisor if this is a good option for the student.)")
+            continue
+
+    # Skip completed
+        if course.name in student.completed_courses:
+            continue
+
+        if student.check_if_can_take(course):
+            print(f"Student can take API course: {course.name}")
+
+    # Save schedule to file    
+    if selected_courses:
+        save_choice = input("\nWould you like to export this schedule to JSON? (y/n): ").lower().strip()
+        if save_choice == 'y':
+            # Call the function
+            save_schedule(selected_courses, student_name)
