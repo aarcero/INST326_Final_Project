@@ -215,19 +215,19 @@ class Course:
             # If time string is not formatted correctly, catch the error and return 0.
             print(f"Warning: Could not parse time for {self.name}")
             return 0
-            
+        
     def is_conflicting(self, other_course):
         """check if this course conflicts with another course based on time and days."""
         # check if they have any common days
         common_days = set(self.dates) & set(other_course.dates)
         if not common_days:
             return False
-        
+    
         return self.start_minutes == other_course.start_minutes
         
     def __str__(self):
         """Returns a readable string of the course."""
-        return f"Course: {self.name}, Section: {self.section}, Time: {self.time}" 
+        return f"Course: {self.name}, Section: {self.section}, Time: {self.time}"
 
 class ProgramCourse:
     def __init__(self, course, category, priority):
@@ -254,6 +254,7 @@ class ProgramCourse:
             prerequisites=prereq_string,
             category=category_value
         )
+        
         # Priority logic
         if "Benchmark" in category_value:
             priority_value = 3
@@ -302,20 +303,18 @@ def convert_api_to_courses(api_data):
 
 def load_courses_from_csv(file_path):
     """Loads course data and returns AdvisorRecommendation objects."""
-    recommendations = []
+    courses = []
     try:
         with open(file_path, mode='r', encoding='utf-8') as csvfile:
             reader = csv.DictReader(csvfile)
-
             for row in reader:
-                rec = AdvisorRecommendation.from_csv_row(row)
-                recommendations.append(rec)
-
+                rec = ProgramCourse.from_csv_row(row)
+                courses.append(rec)
     except FileNotFoundError:
         print(f"Error: {file_path} not found.")
     except Exception as e:
         print(f"An error occurred: {e}")
-    return recommendations
+    return courses
 
 def save_schedule(selected_courses, student_name, filename=None):
     """
@@ -379,17 +378,7 @@ if __name__ == "__main__":
 
     student_name = input("Enter your name: ").strip()
 
-    has_csv = input("Do you have a 4-year plan CSV? (yes/no): ").strip().lower()
-
-    if has_csv == "yes":
-        advisor_name = input("Enter your advisor's name: ").strip()
-        file_path = input("Enter the path to your CSV file: ").strip()
-    else:
-        advisor_name = "Default Advisor"
-        file_path = "infosci_program.csv"
-
     # Load courses from CSV
-    courses = load_courses_from_csv(file_path)
     print(f"Loaded {len(courses)} courses from CSV.\n")
 
     #Extra courses not in CSV but in API
@@ -434,7 +423,16 @@ if __name__ == "__main__":
 
     # Ask completed courses
     completed_input = input("Enter completed courses separated by commas (e.g., INST126,MATH115): ")
-    completed_courses = [c.strip().upper() for c in completed_input.split(",") if c.strip()]
+    completed_courses = [extract_course_code(c.strip().upper()) for c in completed_input.split(",") if c.strip()]
+
+    recommended_input = input(
+        "Enter the classes recommended for this semester separated by commas: "
+    )
+    recommended_courses = [
+        extract_course_code(c.strip().upper())
+        for c in recommended_input.split(",")
+        if c.strip()
+    ]
 
     # Create student
     student = Student(
@@ -442,9 +440,6 @@ if __name__ == "__main__":
         major="InfoSci",
         completed_courses=completed_courses
     )
-
-    # Show advisor-recommended courses the student can take
-    print("Courses from advisor plan student can take (max 15 credits):\n")
 
     selected_courses = []
     total_credits = 0
@@ -465,18 +460,22 @@ if __name__ == "__main__":
 
     Learned how to use lambda from https://www.w3schools.com/python/python_lambda.asp.
     """
-
+    
     sorted_courses = sorted(courses, key=lambda x: x.priority, reverse=True)
 
-    for rec in sorted_courses:
+    for rec in courses:
+        if rec.course.name not in recommended_courses:
+            continue
+
         course = rec.course
 
         # Skip completed courses
         if course.name in student.completed_courses:
             continue
-
+        
         # Check prereqs
         if not student.check_if_can_take(course):
+            print(f"You cannot take {course.name} due to prerequisites.")
             continue
 
         # Default credits safety
@@ -486,6 +485,32 @@ if __name__ == "__main__":
         if total_credits + credits > MAX_CREDITS:
             continue
 
+        selected_courses.append(rec)
+        total_credits += credits
+
+    sorted_courses = sorted(courses, key=lambda x: x.priority, reverse=True)
+
+    for rec in sorted_courses:
+        if total_credits >= MAX_CREDITS:
+            break
+
+        course = rec.course
+
+        if course.name in student.completed_courses:
+            continue
+
+        if course.name in recommended_courses:
+            continue  # already handled
+
+        if not student.check_if_can_take(course):
+            continue
+
+        credits = course.credits if course.credits else 3
+
+        if total_credits + credits > MAX_CREDITS:
+            continue
+
+        print(f"{course.name} added as a filler course. Consider confirming with your advisor.")
         selected_courses.append(rec)
         total_credits += credits
 
