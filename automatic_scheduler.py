@@ -31,9 +31,10 @@ def extract_course_code(course_name):
         return match.group(1).replace(" ", "")
     return course_name
 
-def grab_umd_courses(department="INST", semester="202408"): 
+def grab_umd_courses(course_id, semester):
     """
     Fetches course data from the UMD API for a given department and semester.
+    Returns section-level data including section_id, meetings, days, and times.
 
     Returns:
         list: JSON response containing course data if successful, otherwise empty list.
@@ -41,17 +42,17 @@ def grab_umd_courses(department="INST", semester="202408"):
     Uses the resource https://api.umd.io/v1/courses?department=DEPT&semester=SEMESTER, where DEPT is the department code
     (e.g., "INST") and SEMESTER is the semester code (e.g., "202408" for Fall 2024). Also uses 
     https://www.cbtnuggets.com/blog/technology/programming for understanding how to make API requests in Python using the requests library.
-        department (str): The department code to filter courses (default is "INST").
+        course_id (str): The course ID to fetch sections for.
         semester (str): The semester code to filter courses (default is "202408" for Fall 2024).
     """
-    url = f"https://api.umd.io/v1/courses?department={department}&semester={semester}"
-    
+    url = f"https://api.umd.io/v1/courses/sections?course_id={course_id}&semester={semester}"
+
     response = requests.get(url)
 
     if response.status_code == 200:
         return response.json()
     else:
-        print("Error fetching courses:", response.status_code)
+        print(f"Error fetching sections for {course_id}: {response.status_code}")
         return []
 
 def build_semester_code(year, term):
@@ -141,12 +142,11 @@ class Student(Person):
                     break
 
             if not satisfied:
-                return False 
+                return False
         return True
 
 class Course:
-    def __init__(self, name, credits, prerequisites=None, semester_term=None, 
-                 section=None, time=None, dates=None, category=None):
+    def __init__(self, name, credits, prerequisites=None, semester_term=None, section=None, time=None, dates=None, category=None):
         """
         Initializes a Course instance.
 
@@ -187,11 +187,11 @@ class Course:
         """
         Converts a course start time into minutes since midnight.
 
-        Expected format:
-            "HH:MM-HH:MM"
+        Supports formats like:
+        - 14:00-15:15
+        - 4:00pm-4:50pm
+        - 9:30am-10:45am
 
-        Returns:
-            int: Start time in minutes, or 0 if invalid format.
         """
         if time is None or "-" not in time:
             return 0
@@ -201,14 +201,15 @@ class Course:
         try:
             # .split("-") cuts the string "10:30-12:00" into a list: ["10:30", "12:00"].
             # We use [0] to grab only the first element (the start time).
-            start = time.split("-")[0]
+            start = time.split("-")[0].strip().lower()
+
+            # Handle am/pm format
+            if "am" in start or "pm" in start:
+                dt = datetime.datetime.strptime(start, "%I:%M%p")
+                return dt.hour * 60 + dt.minute
             
-            # start.split(":") breaks "10:30" into ["10", "30"].
-            # map(int, ...) takes each string in that list and converts it into an integer.
-            # This allows us to assign 'hours' and 'minutes'.
+            # Handle 24-hour format
             hours, minutes = map(int, start.split(":"))
-            
-            # Calculate total minutes
             return (hours * 60) + minutes
             
         except (ValueError, IndexError):
@@ -265,8 +266,10 @@ class ProgramCourse:
 
         return cls(temp_course, category_value, priority_value)
 
-def convert_api_to_courses(api_data):
+
+def convert_api_sections_to_courses(section_data):
     """
+    Converts UMD API section data into Course objects with time and date information.
     Converts raw UMD API course data into Course objects.
 
     Handles:
@@ -276,30 +279,46 @@ def convert_api_to_courses(api_data):
 
     Returns:
         list[Course]: List of Course objects created from API data.
+
     """
-    course_objects = []
+    section_courses = []
 
-    for item in api_data:
+    for item in section_data:
         try:
-            name = item.get("course_id", "Unknown")
+            course_name = item.get("course", "Unknown")
+            section_id = item.get("section_id", "")
+            meetings = item.get("meetings", [])
 
-            raw_credits = item.get("credits", "0")
-            try:
-                credits = int(float(raw_credits))
-            except:
-                credits = 3
+            # Default values in case meeting info is missing
+            days = []
+            time = None
+
+            if meetings:
+                first_meeting = meetings[0]
+                raw_days = first_meeting.get("days", "")
+                start_time = first_meeting.get("start_time", "")
+                end_time = first_meeting.get("end_time", "")
+
+                if raw_days:
+                    days = list(raw_days)
+
+                if start_time and end_time:
+                    time = f"{start_time}-{end_time}"
 
             course = Course(
-                name=name,
-                credits=credits
+                name=course_name,
+                credits=3,  # temporary fallback
+                section=section_id,
+                time=time,
+                dates=days
             )
 
-            course_objects.append(course)
+            section_courses.append(course)
 
         except Exception as e:
-            print("Error converting course:", item, e)
+            print("Error converting section:", item, e)
 
-    return course_objects
+    return section_courses
 
 def load_courses_from_csv(file_path):
     """Loads course data and returns AdvisorRecommendation objects."""
@@ -363,6 +382,20 @@ def save_schedule(selected_courses, student_name, filename=None):
     except IOError as e:
         print(f"\nERROR: Failed to write to file: {e}")
 
+def get_sections_for_recommended_courses(recommended_courses, semester):
+    """
+    Fetch section data for all recommended courses and return
+    Course objects with date/time/section info.
+    """
+    all_sections = []
+
+    for course_id in recommended_courses:
+        raw_sections = grab_umd_courses(course_id, semester)
+        converted_sections = convert_api_sections_to_courses(raw_sections)
+        all_sections.extend(converted_sections)
+
+    return all_sections
+
 if __name__ == "__main__":
     print("Academic Scheduler starting\n")
 
@@ -378,10 +411,7 @@ if __name__ == "__main__":
 
     student_name = input("Enter your name: ").strip()
 
-    # Load courses from CSV
-    print(f"Loaded {len(courses)} courses from CSV.\n")
-
-    #Extra courses not in CSV but in API
+    # Extra courses not in CSV but in API
     csv_course_names = {rec.course.name for rec in courses}
 
     # Ask academic standing
@@ -412,15 +442,6 @@ if __name__ == "__main__":
 
     print(f"\nSelected semester: {semester}")
 
-    # Fetching API data
-    courses_data = grab_umd_courses(semester=semester)
-    print(f"Fetched {len(courses_data)} courses from UMD API.\n")
-
-    # Converting API data to Course objects
-    api_courses = convert_api_to_courses(courses_data)
-    print(f"Converted {len(api_courses)} API courses into Course objects.\n")
-
-
     # Ask completed courses
     completed_input = input("Enter completed courses separated by commas (e.g., INST126,MATH115): ")
     completed_courses = [extract_course_code(c.strip().upper()) for c in completed_input.split(",") if c.strip()]
@@ -434,6 +455,27 @@ if __name__ == "__main__":
         if c.strip()
     ]
 
+    engl_options = {"ENGL391", "ENGL393"}
+
+    has_engl_requirement = any(course in completed_courses for course in engl_options)
+    plans_engl_requirement = any(course in recommended_courses for course in engl_options)
+
+    answer = "no"
+    if not has_engl_requirement and not plans_engl_requirement:
+        answer = input("You have not listed ENGL391 or ENGL393. Will you be taking one of them this semester? (yes/no): ").strip().lower()
+
+    if answer == "yes":
+        engl_choice = input("Which one will you take? Enter ENGL391 or ENGL393: ").strip().upper()
+
+        if engl_choice in {"ENGL391", "ENGL393"}:
+            recommended_courses.append(engl_choice)
+
+    recommended_api_sections = get_sections_for_recommended_courses(recommended_courses, semester)
+
+    print("\nRecommended course sections from API:")
+    for section in recommended_api_sections:
+        print(f"{section.name} | Section: {section.section} | Days: {''.join(section.dates)} | Time: {section.time}")
+
     # Create student
     student = Student(
         name=student_name,
@@ -444,6 +486,62 @@ if __name__ == "__main__":
     selected_courses = []
     total_credits = 0
     MAX_CREDITS = 15
+
+    for section in recommended_api_sections:
+        course_name = section.name
+
+        if not section.time or not section.dates:
+            continue
+
+        if course_name in student.completed_courses:
+            continue
+
+        if any(existing.course.name == course_name for existing in selected_courses):
+            continue
+
+        rec = next((r for r in courses if r.course.name == course_name), None)
+
+        if rec:
+            base_course = rec.course
+            category = rec.category
+            priority = rec.priority
+        else:
+            # For courses not in CSV (like ENGL)
+            base_course = Course(name=course_name, credits=3)
+            category = "External"
+            priority = 1
+
+        if not student.check_if_can_take(base_course):
+            print(f"You cannot take {course_name} due to prerequisites.")
+            continue
+
+        credits = base_course.credits if base_course.credits else 3
+
+        if total_credits + credits > MAX_CREDITS:
+            continue
+
+        scheduled_course = Course(
+            name=base_course.name,
+            credits=base_course.credits,
+            prerequisites=base_course.prerequisites,
+            category=base_course.category,
+            section=section.section,
+            time=section.time,
+            dates=section.dates
+        )
+
+        scheduled_rec = ProgramCourse(
+            course=scheduled_course,
+            category=category,
+            priority=priority
+        )
+
+        selected_courses.append(scheduled_rec)
+        total_credits += credits
+
+    # =========================
+    # END FIXED LOOP
+    # =========================
 
     """
     Lamba functions are anonymous functions defined with the lambda keyword. In this code, we use a lambda function as the key for sorting 
@@ -460,33 +558,6 @@ if __name__ == "__main__":
 
     Learned how to use lambda from https://www.w3schools.com/python/python_lambda.asp.
     """
-    
-    sorted_courses = sorted(courses, key=lambda x: x.priority, reverse=True)
-
-    for rec in courses:
-        if rec.course.name not in recommended_courses:
-            continue
-
-        course = rec.course
-
-        # Skip completed courses
-        if course.name in student.completed_courses:
-            continue
-        
-        # Check prereqs
-        if not student.check_if_can_take(course):
-            print(f"You cannot take {course.name} due to prerequisites.")
-            continue
-
-        # Default credits safety
-        credits = course.credits if course.credits else 3
-
-        # Stop if adding exceeds limit
-        if total_credits + credits > MAX_CREDITS:
-            continue
-
-        selected_courses.append(rec)
-        total_credits += credits
 
     sorted_courses = sorted(courses, key=lambda x: x.priority, reverse=True)
 
@@ -501,6 +572,9 @@ if __name__ == "__main__":
 
         if course.name in recommended_courses:
             continue  # already handled
+
+        if any(existing.course.name == course.name for existing in selected_courses):
+            continue
 
         if not student.check_if_can_take(course):
             continue
@@ -520,25 +594,8 @@ if __name__ == "__main__":
 
     print(f"\nTotal Credits: {total_credits}")
 
-    # Show API courses the student can take
-    for course in api_courses:
-        if not course.name.startswith("INST"):
-            continue
-
-        if course.name not in csv_course_names:
-            print(f"API course not in CSV: {course.name} (Ask advisor if this is a good option for the student.)")
-            continue
-
-    # Skip completed
-        if course.name in student.completed_courses:
-            continue
-
-        if student.check_if_can_take(course):
-            print(f"Student can take API course: {course.name}")
-
-    # Save schedule to file    
+    # Save schedule to file
     if selected_courses:
         save_choice = input("\nWould you like to export this schedule to JSON? (y/n): ").lower().strip()
         if save_choice == 'y':
-            # Call the function
             save_schedule(selected_courses, student_name)
