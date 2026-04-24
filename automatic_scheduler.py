@@ -1,9 +1,9 @@
-import sys
 import csv
 import re
 import json
 import datetime
 import requests
+import random
 
 def extract_course_code(course_name):
     """
@@ -146,7 +146,7 @@ class Student(Person):
         return True
 
 class Course:
-    def __init__(self, name, credits, prerequisites=None, semester_term=None, section=None, time=None, dates=None, category=None):
+    def __init__(self, name, credits, prerequisites=None, semester_term=None, section=None, time=None, dates=None, category=None, open_seats=None):
         """
         Initializes a Course instance.
 
@@ -179,6 +179,7 @@ class Course:
         self.section = section
         self.time = time
         self.category = category
+        self.open_seats = open_seats
 
         # Convert time string to numeric minutes for conflict detection.
         self.start_minutes = self.convert_time_to_minutes(time)
@@ -228,7 +229,7 @@ class Course:
         
     def __str__(self):
         """Returns a readable string of the course."""
-        return f"Course: {self.name}, Section: {self.section}, Time: {self.time}"
+        return f"Course: {self.name}, Section: {self.section}, Days: {''.join(self.dates)}, Time: {self.time}"
 
 class ProgramCourse:
     def __init__(self, course, category, priority):
@@ -281,6 +282,7 @@ def convert_api_sections_to_courses(section_data):
         list[Course]: List of Course objects created from API data.
 
     """
+
     section_courses = []
 
     for item in section_data:
@@ -288,6 +290,8 @@ def convert_api_sections_to_courses(section_data):
             course_name = item.get("course", "Unknown")
             section_id = item.get("section_id", "")
             meetings = item.get("meetings", [])
+
+            open_seats = int(item.get("open_seats", 0))
 
             # Default values in case meeting info is missing
             days = []
@@ -305,15 +309,16 @@ def convert_api_sections_to_courses(section_data):
                 if start_time and end_time:
                     time = f"{start_time}-{end_time}"
 
-            course = Course(
-                name=course_name,
-                credits=3,  # temporary fallback
-                section=section_id,
-                time=time,
-                dates=days
-            )
+                course = Course(
+                    name=course_name,
+                    credits=3,
+                    section=section_id,
+                    time=time,
+                    dates=days,
+                    open_seats=open_seats
+                )
 
-            section_courses.append(course)
+                section_courses.append(course)
 
         except Exception as e:
             print("Error converting section:", item, e)
@@ -321,7 +326,7 @@ def convert_api_sections_to_courses(section_data):
     return section_courses
 
 def load_courses_from_csv(file_path):
-    """Loads course data and returns AdvisorRecommendation objects."""
+    """Loads course data and returns ProgramCourse objects."""
     courses = []
     try:
         with open(file_path, mode='r', encoding='utf-8') as csvfile:
@@ -367,7 +372,10 @@ def save_schedule(selected_courses, student_name, filename=None):
             "credits": rec.course.credits,
             "category": rec.category,
             "priority_level": rec.priority,
-            "time_info": rec.course.time if hasattr(rec.course, 'time') else "N/A"
+            "section": rec.course.section,
+            "days": ''.join(rec.course.dates),
+            "time_info": rec.course.time if hasattr(rec.course, 'time') else "N/A",
+            "open_seats": rec.course.open_seats
         })
     
     # Write to file and provide feedback
@@ -411,9 +419,6 @@ if __name__ == "__main__":
 
     student_name = input("Enter your name: ").strip()
 
-    # Extra courses not in CSV but in API
-    csv_course_names = {rec.course.name for rec in courses}
-
     # Ask academic standing
     print("\n--- Semester Selection ---")
 
@@ -446,14 +451,18 @@ if __name__ == "__main__":
     completed_input = input("Enter completed courses separated by commas (e.g., INST126,MATH115): ")
     completed_courses = [extract_course_code(c.strip().upper()) for c in completed_input.split(",") if c.strip()]
 
-    recommended_input = input(
-        "Enter the classes recommended for this semester separated by commas: "
-    )
-    recommended_courses = [
-        extract_course_code(c.strip().upper())
-        for c in recommended_input.split(",")
-        if c.strip()
-    ]
+    has_recommended = input("Do you have classes recommended by your advisor for this semester? (yes/no): ").strip().lower()
+
+    recommended_courses = []
+
+    if has_recommended == "yes":
+        recommended_input = input("Enter the classes recommended for this semester separated by commas: ")
+
+        recommended_courses = [
+            extract_course_code(c.strip().upper())
+            for c in recommended_input.split(",")
+            if c.strip()
+        ]
 
     engl_options = {"ENGL391", "ENGL393"}
 
@@ -470,11 +479,9 @@ if __name__ == "__main__":
         if engl_choice in {"ENGL391", "ENGL393"}:
             recommended_courses.append(engl_choice)
 
-    recommended_api_sections = get_sections_for_recommended_courses(recommended_courses, semester)
+    print("\nThinking about your class options...")
 
-    print("\nRecommended course sections from API:")
-    for section in recommended_api_sections:
-        print(f"{section.name} | Section: {section.section} | Days: {''.join(section.dates)} | Time: {section.time}")
+    recommended_api_sections = get_sections_for_recommended_courses(recommended_courses, semester)
 
     # Create student
     student = Student(
@@ -491,6 +498,9 @@ if __name__ == "__main__":
         course_name = section.name
 
         if not section.time or not section.dates:
+            continue
+
+        if section.open_seats is not None and section.open_seats <= 0:
             continue
 
         if course_name in student.completed_courses:
@@ -527,7 +537,8 @@ if __name__ == "__main__":
             category=base_course.category,
             section=section.section,
             time=section.time,
-            dates=section.dates
+            dates=section.dates,
+            open_seats=section.open_seats
         )
 
         scheduled_rec = ProgramCourse(
@@ -538,10 +549,6 @@ if __name__ == "__main__":
 
         selected_courses.append(scheduled_rec)
         total_credits += credits
-
-    # =========================
-    # END FIXED LOOP
-    # =========================
 
     """
     Lamba functions are anonymous functions defined with the lambda keyword. In this code, we use a lambda function as the key for sorting 
@@ -560,6 +567,16 @@ if __name__ == "__main__":
     """
 
     sorted_courses = sorted(courses, key=lambda x: x.priority, reverse=True)
+
+    same_priority_groups = {}
+    for rec in sorted_courses:
+        same_priority_groups.setdefault(rec.priority, []).append(rec)
+
+    sorted_courses = []
+    for priority in sorted(same_priority_groups.keys(), reverse=True):
+        group = same_priority_groups[priority]
+        random.shuffle(group)
+        sorted_courses.extend(group)
 
     for rec in sorted_courses:
         if total_credits >= MAX_CREDITS:
@@ -584,8 +601,42 @@ if __name__ == "__main__":
         if total_credits + credits > MAX_CREDITS:
             continue
 
+        section_options = get_sections_for_recommended_courses([course.name], semester)
+
+        chosen_section = None
+
+        for section in section_options:
+            if not section.section or not section.time or not section.dates:
+                continue
+
+            if section.open_seats is not None and section.open_seats <= 0:
+                continue
+
+            chosen_section = section
+            break
+
+        if not chosen_section:
+            continue
+
+        scheduled_course = Course(
+            name=course.name,
+            credits=course.credits,
+            prerequisites=course.prerequisites,
+            category=course.category,
+            section=chosen_section.section,
+            time=chosen_section.time,
+            dates=chosen_section.dates,
+            open_seats=chosen_section.open_seats
+        )
+
+        scheduled_rec = ProgramCourse(
+            course=scheduled_course,
+            category=rec.category,
+            priority=rec.priority
+        )
+
         print(f"{course.name} added as a filler course. Consider confirming with your advisor.")
-        selected_courses.append(rec)
+        selected_courses.append(scheduled_rec)
         total_credits += credits
 
     # Print final schedule
