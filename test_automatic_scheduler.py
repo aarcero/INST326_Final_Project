@@ -173,3 +173,13 @@ def test_csv_to_object():
     assert course.prerequisites == ["INST126"]
     assert course.time == "12:00-1:15"
     assert course.dates == ["M", "W", "F"]
+# Tests for buld semester code
+def test_build_semester_code_summer():
+    assert build_semester_code("2026", "Summer") == "202605"
+
+def test_build_semester_code_whitespaces():
+    assert build_semester_code("2026", "  Spring      ") == "202608"
+
+def test_build_semester_code_unknown_semester():
+    with pytest.raises(ValueError):
+        build_semester_code("2026", "Winter")
