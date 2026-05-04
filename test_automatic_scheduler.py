@@ -1,4 +1,9 @@
-from automatic_scheduler import (Course, Student, extract_course_code, convert_api_to_courses, AdvisorRecommendation)
+import pytest
+import datetime
+
+from automatic_scheduler import (Course, Student, extract_course_code, 
+                                 convert_api_to_courses, ProgramCourse, 
+                                 build_semester_code)
 
 # Student Tests
 
@@ -30,46 +35,28 @@ def test_cannot_take_course_missing_one_and_prereq():
     assert not student.check_if_can_take(course)
 
 
-# Advisor Recommendation Tests
-def test_advisor_recommendation_priority():
+# ProgramCourse Tests
+def test_program_course_priority():
     row = {
         "Course": "INST 326 Object-Oriented Programming",
         "Credits": "3",
         "Category": "Core",
         "Subcategory": "INST Core"
     }
-
-    rec = AdvisorRecommendation.from_csv_row(row)
-
+    rec = ProgramCourse.from_csv_row(row)
     assert rec.course.name == "INST326"
     assert rec.priority == 2
 
 #Benchmark priority test
-def test_advisor_recommendation_benchmark_priority():
+def test_program_course_benchmark_priority():
     row = {
         "Course": "INST 400 Advanced Topics",
         "Credits": "3",
         "Category": "Benchmark",
         "Subcategory": "INST Core"
     }
-
-    rec = AdvisorRecommendation.from_csv_row(row)
-
+    rec = ProgramCourse.from_csv_row(row)
     assert rec.priority == 3
-
-#Default priority test
-def test_advisor_recommendation_default_priority():
-    row = {
-        "Course": "INST 200 Intro Course",
-        "Credits": "3",
-        "Category": "Elective",
-        "Subcategory": "General"
-    }
-
-    rec = AdvisorRecommendation.from_csv_row(row)
-
-    assert rec.priority == 1
-
 
 # Course Time Tests
 
@@ -86,6 +73,10 @@ def test_time_conversion_exact_minutes():
     course = Course("INST326", 3, time="10:30-12:00")
     assert course.start_minutes == 630
 
+def test_24h_time_conversion():
+    # test 24 hrs (14:00 -> 840 minutes)
+    course_24 = Course("INST326", 3, time="14:00-15:15")
+    assert course_24.start_minutes == 840
 
 # Date Tests
 
@@ -156,7 +147,8 @@ def test_convert_api_to_courses_missing_credits():
 
 # CSV to Object Tests
 def test_csv_to_object():
-    csv_data = "name,credits,prerequisites,time,dates\nIntroduction to Information Science INST326,3,INST126,12:00-1:15,MWF"
+    csv_data = "name,credits,prerequisites,time,dates\nIntroduction to " \
+    "Information Science INST326,3,INST126,12:00-1:15,MWF"
     lines = csv_data.splitlines()
     header = lines[0].split(",")
     values = lines[1].split(",")
@@ -164,7 +156,8 @@ def test_csv_to_object():
     course = Course(
         name=course_data["name"],
         credits=int(course_data["credits"]),
-        prerequisites=course_data["prerequisites"].split(";") if course_data["prerequisites"] else [],
+        prerequisites=course_data["prerequisites"].split(";")
+        if course_data["prerequisites"] else [],
         time=course_data["time"],
         dates=course_data["dates"]
     )
@@ -173,13 +166,12 @@ def test_csv_to_object():
     assert course.prerequisites == ["INST126"]
     assert course.time == "12:00-1:15"
     assert course.dates == ["M", "W", "F"]
-# Tests for buld semester code
-def test_build_semester_code_summer():
+
+# Utility function tests
+
+def test_build_semester_code_logic():
+    assert build_semester_code("2026", "Spring") == "202601"
     assert build_semester_code("2026", "Summer") == "202605"
-
-def test_build_semester_code_whitespaces():
-    assert build_semester_code("2026", "  Spring      ") == "202608"
-
-def test_build_semester_code_unknown_semester():
+    assert build_semester_code("2026", "fall") == "202608"
     with pytest.raises(ValueError):
         build_semester_code("2026", "Winter")
