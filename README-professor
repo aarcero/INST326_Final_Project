@@ -1,0 +1,36 @@
+Here are some simple ways to use the terminal since you are not a student.
+
+# First Year First Semester Student
+Just press enter for courses taken, and advisor courses as well as typing no for ENGL
+
+It will generate a course for you using benchmark courses
+
+EX.
+
+Enter year (e.g., 2026): 2026
+
+Select term:
+1. Spring
+2. Summer
+3. Fall
+Enter choice (1/2/3): 3
+
+Selected semester: 202608
+Enter completed courses separated by commas (e.g., INST126,MATH115): 
+Do you have classes recommended by your advisor for this semester? (yes/no): no
+You have not listed ENGL391 or ENGL393. Will you be taking one of them this semester? (yes/no): no
+
+# First Year Second Semester Student and so forth
+
+You can use the classes generated from the first semester to generate second semester and so forth.
+
+# Replicating Alden's Schedule
+
+Please enter the course that I have completed.
+
+MATH115, PSYC100, PHIL100, STAT100, INST126, INST201, INST311, INST326, INST327, INST335, INST352
+
+You may choose to generate the schedule in any way there forward and it would remain similar to Alden's 4 year plan.
+
+
+
