@@ -547,6 +547,10 @@ if __name__ == "__main__":
             priority=priority
         )
 
+        #prevent overlapping classes
+        if any(scheduled_course.is_conflicting(existing.course) for existing in selected_courses):
+            continue
+        
         selected_courses.append(scheduled_rec)
         total_credits += credits
 
@@ -634,6 +638,10 @@ if __name__ == "__main__":
             category=rec.category,
             priority=rec.priority
         )
+
+        #prevent overlapping classes
+        if any(scheduled_course.is_conflicting(existing.course) for existing in selected_courses):
+            continue
 
         print(f"{course.name} added as a filler course. Consider confirming with your advisor.")
         selected_courses.append(scheduled_rec)
