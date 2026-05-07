@@ -4,6 +4,15 @@ GeeksforGeeks. (2025, July 11). Python: Extract words from given string.
 Python code for pulling API data easily. CBT Nuggets. (n.d.). https://www.cbtnuggets.com/blog/technology/programming
     python-code-pulling-api-data 
 
+Reference for datetime parsing: 
+    https://docs.python.org/3/library/datetime.html
+
+Reference for strip() Method:
+    https://www.geeksforgeeks.org/python/python-string-strip/
+
+Reference for @classmethod use:
+        https://www.geeksforgeeks.org/python/classmethod-in-python/
+
 Umd.io (1.0.0 beta). umd.io. (n.d.). https://beta.umd.io/ 
 
 W3schools.com. W3Schools Online Web Tutorials. (n.d.-a). https://www.w3schools.com/python/python_lambda.asp 

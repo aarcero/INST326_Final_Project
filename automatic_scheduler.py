@@ -89,6 +89,9 @@ class Student(Person):
 
     Returns:
         bool: True if all prerequisite groups are satisfied, False otherwise.
+
+    use the resource: https://www.geeksforgeeks.org/python/python-string-strip/
+    for understanding how to use the strip() method to clean up whitespace from strings.
     """
     def __init__(self, name, major, directory_id=None, completed_courses=None):
         super().__init__(name, directory_id)
@@ -193,6 +196,8 @@ class Course:
         - 4:00pm-4:50pm
         - 9:30am-10:45am
 
+        use the resource: https://docs.python.org/3/library/datetime.html 
+        for understanding how to parse and manipulate time in Python using the datetime module.
         """
         if time is None or "-" not in time:
             return 0
@@ -205,6 +210,7 @@ class Course:
             start = time.split("-")[0].strip().lower()
 
             # Handle am/pm format
+            # %I is the hour (1-12), %M is the minute, and %p is the AM/PM marker.
             if "am" in start or "pm" in start:
                 dt = datetime.datetime.strptime(start, "%I:%M%p")
                 return dt.hour * 60 + dt.minute
@@ -239,6 +245,14 @@ class ProgramCourse:
 
     @classmethod
     def from_csv_row(cls, row):
+        """
+        Creates a ProgramCourse instance from a single CSV row.
+        
+        This method handles data cleaning, course code extraction, and 
+        priority assignment based on the course category.
+
+        use the resource: https://www.geeksforgeeks.org/python/classmethod-in-python/
+        """
         # Get values from CSV
         raw_credits = row.get("Credits", "0").strip()
         credits_value = int(raw_credits) if raw_credits.isdigit() else 0
